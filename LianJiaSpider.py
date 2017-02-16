@@ -134,6 +134,24 @@ def gen_chengjiao_insert_command(info_dict):
     command=(r"insert into chengjiao values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",t)
     return command
 
+
+def gen_ershoufang_insert_command(info_dict):
+    """
+    生成成交记录数据库插入命令
+    """
+    info_list=[u'链接',u'小区名称',u'户型',u'面积',u'朝向',u'楼层',u'建造时间',u'装修',u'挂牌单价',u'挂牌总价',u'房产类型',u'交易',u'地铁',u'地址']
+    t=[]
+    for il in info_list:
+        if il in info_dict:
+            t.append(info_dict[il])
+        else:
+            t.append('')
+    t=tuple(t)
+    csv_es_writer.writerow(t)
+    command=(r"insert into ershoufang values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",t)
+    return command
+
+
 def xiaoqu_spider(db_xq,url_page=u"http://sh.lianjia.com/xiaoqu/pg1rs%E6%B5%A6%E4%B8%9C/"):
     """
     爬取页面链接中的小区信息
@@ -214,7 +232,6 @@ def do_xiaoqu_spider(db_xq,region=u"浦东"):
     爬取大区域中的所有小区信息
     """
     url=u"http://sh.lianjia.com/xiaoqu/rs"+region+"/"
-    print url
     try:
         req = urllib2.Request(url,headers=hds[random.randint(0,len(hds)-1)])
         source_code = urllib2.urlopen(req,timeout=5).read()
@@ -248,7 +265,6 @@ def chengjiao_spider(db_cj,url_page=u"http://sh.lianjia.com/chengjiao/pg1rs%E4%B
     """
     爬取页面链接中的成交记录
     """
-    print url_page
     try:
         req = urllib2.Request(url_page,headers=hds[random.randint(0,len(hds)-1)])
         source_code = urllib2.urlopen(req,timeout=10).read()
@@ -278,11 +294,15 @@ def chengjiao_spider(db_cj,url_page=u"http://sh.lianjia.com/chengjiao/pg1rs%E4%B
         content = cj.find('div',{'class':'con'})
         if content:
             info = content.text.strip().split()
-            if len(info)>=7:
+            if len(info)>=1:
                 info_dict.update({u'大区域':info[0]})
+            if len(info)>=2:
                 info_dict.update({u'小区域':info[1]})
+            if len(info)>=4:
                 info_dict.update({u'楼层':info[3]})
+            if len(info)>=6:
                 info_dict.update({u'朝向':info[5]})
+            if len(info)>=8:
                 info_dict.update({u'装修':info[7]})
         content=cj.findAll('div',{'class':'div-cun'})
         if content:
@@ -323,6 +343,81 @@ def chengjiao_spider(db_cj,url_page=u"http://sh.lianjia.com/chengjiao/pg1rs%E4%B
         db_cj.execute(command,1)
 
 
+def ershoufang_spider(db_es,url_page=u"http://sh.lianjia.com/ershoufang/pg1rs%E4%B8%9C%E5%9F%8E%E6%96%B0%E6%9D%91/"):
+    """
+    爬取页面链接中的记录
+    """
+    try:
+        req = urllib2.Request(url_page,headers=hds[random.randint(0,len(hds)-1)])
+        source_code = urllib2.urlopen(req,timeout=10).read()
+        plain_text=unicode(source_code)#,errors='ignore')
+        soup = BeautifulSoup(plain_text, "lxml")
+    except (urllib2.HTTPError, urllib2.URLError), e:
+        print e
+        exception_write('ershoufang_spider',url_page)
+        return
+    except Exception,e:
+        print e
+        exception_write('ershoufang_spider',url_page)
+        return
+
+    cj_list=soup.findAll('div',{'class':'info-panel'})
+    for cj in cj_list:
+        info_dict={}
+        href=u"http://sh.lianjia.com"+cj.find('a')["href"]
+        if not href:
+            continue
+        info_dict.update({u'链接':href})
+        info=cj.find('div',{'class':'where'}).findAll('span')
+        info_dict.update({u'小区名称':info[0].text})
+        info_dict.update({u'户型':info[1].text})
+        info_dict.update({u'面积':info[2].text})
+        try:
+            req1 = urllib2.Request(href,headers=hds[random.randint(0,len(hds)-1)])
+            source_code1 = urllib2.urlopen(req1,timeout=10).read()
+            plain_text1=unicode(source_code1)#,errors='ignore')
+            soup1 = BeautifulSoup(plain_text1, "lxml")
+        except (urllib2.HTTPError, urllib2.URLError), e:
+            print e
+            exception_write('ershoufang_spider',href)
+            return
+        except Exception,e:
+            print e
+            exception_write('ershoufang_spider',href)
+            return
+        info_dict.update({u'地址':soup1.find('p',{'class':'addrEllipsis fl ml_5'})["title"]})
+        tr=soup1.find('table',{'class':'aroundInfo'}).findAll('tr')
+        info_dict.update({u'挂牌单价':tr[0].text.split()[1]})
+        td=tr[1].findAll('td')
+        info_dict.update({u'楼层':td[0].text.strip().split()[1]})
+        info_dict.update({u'建造时间':td[1].text.strip().split()[1]})
+        td=tr[2].findAll('td')
+        info_dict.update({u'装修':td[0].text.strip().split()[1]})
+        info_dict.update({u'朝向':td[1].text.strip().split()[1]})
+        """
+        subway
+        """
+        subway = soup.find('span',{'class','fang-subway-ex'})
+        if subway:
+            info_dict.update({u'地铁':subway.find('span').text})
+        else:
+            info_dict.update({u'地铁':"NA"})
+        """
+        price
+        """
+        price = soup.find('div',{'class':'col-3'}).find('span').text+'万'
+        info_dict.update({u'挂牌总价':price})
+        """
+        style
+        """
+        style = soup1.find('div',{'class':'transaction'}).findAll('li')
+        t = style[1].text.strip().split()[1]+style[1].text.strip().split()[2]+style[1].text.strip().split()[3]
+        info_dict.update({u'房产类型':t})
+        info_dict.update({u'交易':style[2].text.strip().split()[1]})
+        command=gen_ershoufang_insert_command(info_dict)
+        db_es.execute(command,1)
+
+
 def xiaoqu_chengjiao_spider(db_cj,xq_name=u"东城新村"):
     """
     爬取小区成交记录
@@ -355,6 +450,39 @@ def xiaoqu_chengjiao_spider(db_cj,xq_name=u"东城新村"):
         t.join()
 
 
+def xiaoqu_ershoufang_spider(db_es,xq_name=u"东城新村"):
+    """
+    爬取小区sale记录
+    """
+    url=u"http://sh.lianjia.com/ershoufang/rs"+urllib2.quote(xq_name)+"/"
+    try:
+        req = urllib2.Request(url,headers=hds[random.randint(0,len(hds)-1)])
+        source_code = urllib2.urlopen(req,timeout=10).read()
+        plain_text=unicode(source_code)#,errors='ignore')
+        soup = BeautifulSoup(plain_text, "lxml")
+    except (urllib2.HTTPError, urllib2.URLError), e:
+        print e
+        exception_write('xiaoqu_ershoufang_spider',xq_name)
+        return
+    except Exception,e:
+        print e
+        exception_write('xiaoqu_ershoufang_spider',xq_name)
+        return
+    num = soup.find('div', {'class':'secondcon fl'}).findAll('span',{'class':'botline'})[1].find('strong').text
+    total_num = int(num)
+    total_pages = int((int(total_num) + 19) / 20)
+
+    threads=[]
+    for i in range(total_pages):
+        url_page=u"http://sh.lianjia.com/ershoufang/pg%drs%s/" % (i+1,urllib2.quote(xq_name))
+        t=threading.Thread(target=ershoufang_spider,args=(db_es,url_page))
+        threads.append(t)
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+
 def do_xiaoqu_chengjiao_spider(db_xq,db_cj):
     """
     批量爬取小区成交记录
@@ -364,7 +492,20 @@ def do_xiaoqu_chengjiao_spider(db_xq,db_cj):
     for xq in xq_list:
         xiaoqu_chengjiao_spider(db_cj,xq[0])
         count+=1
-        print 'have spidered %d xiaoqu' % count
+        #print 'Spidered %d xiaoqu' % count
+    print 'done'
+
+
+def do_xiaoqu_ershoufang_spider(db_xq,db_es):
+    """
+    批量爬取小区成交记录
+    """
+    count=0
+    xq_list=db_xq.fetchall()
+    for xq in xq_list:
+        xiaoqu_ershoufang_spider(db_es,xq[0])
+        count+=1
+        #print 'Spidered %d xiaoqu on sale houses' % count
     print 'done'
 
 
@@ -428,16 +569,23 @@ if __name__=="__main__":
     #爬下所有的小区信息
     for region in regions:
         command="create table if not exists xiaoqu (href TEXT primary key UNIQUE, name TEXT, regionb TEXT, regions TEXT, year TEXT, subway TEXT, sale_price TEXT, sale_num TEXT, sale_link TEXT)"
-        db_xq=SQLiteWraper('lianjia-sh-'+region+'-xq.db',command)
+        db_xq=SQLiteWraper('lianjia-sh-'+region+'.db',command)
         command="create table if not exists chengjiao (href TEXT primary key UNIQUE, name TEXT, regionb TEXT, regions TEXT, style TEXT, area TEXT, orientation TEXT, floor TEXT, year TEXT, look TEXT, sign_time TEXT, unit_price TEXT, total_price TEXT,fangchan_class TEXT, school TEXT, subway TEXT, address TEXT)"
-        db_cj=SQLiteWraper('lianjia-sh-'+region+'-cj.db',command)
+        db_cj=SQLiteWraper('lianjia-sh-'+region+'.db',command)
+        command="create table if not exists ershoufang (href TEXT primary key UNIQUE, name TEXT, style TEXT, area TEXT, orientation TEXT, floor TEXT, year TEXT, look TEXT, unit_price TEXT, total_price TEXT,fangchan_class TEXT, trade TEXT, subway TEXT, address TEXT)"
+        db_es=SQLiteWraper('lianjia-sh-'+region+'.db',command)
         csv_file = open(region+".csv","wb")
         csv_writer = csv.writer(csv_file, delimiter=',')
         do_xiaoqu_spider(db_xq,region)
         csv_cj_file = open(region+"-cj.csv","wb")
         csv_cj_writer = csv.writer(csv_cj_file, delimiter=',')
         do_xiaoqu_chengjiao_spider(db_xq,db_cj)
+        csv_es_file = open(region+"-esf.csv","wb")
+        csv_es_writer = csv.writer(csv_es_file, delimiter=',')
+        do_xiaoqu_ershoufang_spider(db_xq,db_es)
         exception_spider(db_cj)
+        exception_spider(db_es)
         csv_file.close()
         csv_cj_file.close()
+        csv_es_file.close()
 
