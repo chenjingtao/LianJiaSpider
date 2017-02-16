@@ -20,11 +20,11 @@ opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
 urllib2.install_opener(opener)
 
 
-home_url = 'http://bj.lianjia.com/'
-auth_url = 'https://passport.lianjia.com/cas/login?service=http%3A%2F%2Fbj.lianjia.com%2F'
-chengjiao_url = 'http://bj.lianjia.com/chengjiao/'
- 
- 
+home_url = 'http://sh.lianjia.com/'
+auth_url = 'https://passport.lianjia.com/cas/login?service=http%3A%2F%2Fsh.lianjia.com%2F'
+chengjiao_url = 'http://sh.lianjia.com/chengjiao/'
+
+
 headers = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Encoding': 'gzip, deflate, sdch',
@@ -39,7 +39,7 @@ headers = {
 }
 
 # 获取lianjia_uuid
-req = urllib2.Request('http://bj.lianjia.com/')
+req = urllib2.Request('http://sh.lianjia.com/')
 opener.open(req)
 # 初始化表单
 req = urllib2.Request(auth_url, headers=headers)
@@ -58,7 +58,7 @@ pattern = re.compile(r'value=\"(LT-.*)\"')
 lt = pattern.findall(html_content)[0]
 pattern = re.compile(r'name="execution" value="(.*)"')
 execution = pattern.findall(html_content)[0]
- 
+
 
 # data
 data = {
@@ -85,12 +85,12 @@ headers = {
     'Host': 'passport.lianjia.com',
     'Origin': 'https://passport.lianjia.com',
     'Pragma': 'no-cache',
-    'Referer': 'https://passport.lianjia.com/cas/login?service=http%3A%2F%2Fbj.lianjia.com%2F',
+    'Referer': 'https://passport.lianjia.com/cas/login?service=http%3A%2F%2Fsh.lianjia.com%2F',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36',
     'Upgrade-Insecure-Requests': '1',
     'X-Requested-With': 'XMLHttpRequest',
 }
- 
+
 
 req = urllib2.Request(auth_url, post_data, headers)
 
@@ -98,9 +98,9 @@ req = urllib2.Request(auth_url, post_data, headers)
 try:
     result = opener.open(req)
 except urllib2.HTTPError, e:
-    print e.getcode()  
-    print e.reason  
-    print e.geturl()  
+    print e.getcode()
+    print e.reason
+    print e.geturl()
     print e.info()
     req = urllib2.Request(e.geturl())
     result = opener.open(req)
